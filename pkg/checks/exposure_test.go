@@ -54,8 +54,8 @@ func TestCheckNetworkExposure_NATEnabled(t *testing.T) {
 	if found == nil {
 		t.Fatal("expected finding N-2 for NAT enabled")
 	}
-	if found.Severity != scanner.High {
-		t.Errorf("severity = %v, want HIGH", found.Severity)
+	if found.Severity != scanner.Medium {
+		t.Errorf("severity = %v, want MEDIUM", found.Severity)
 	}
 }
 

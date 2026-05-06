@@ -34,7 +34,7 @@ func CheckNetworkExposure(cfg *config.LndConfig) []scanner.Finding {
 		findings = append(findings, scanner.Finding{
 			ID:       "N-2",
 			Module:   "transport",
-			Severity: scanner.High,
+			Severity: scanner.Medium,
 			Title:    "NAT traversal (UPnP) is enabled",
 			Description: "nat=true instructs LND to use UPnP to automatically open ports on your router. " +
 				"This bypasses firewall rules and exposes your node without explicit operator action.",
