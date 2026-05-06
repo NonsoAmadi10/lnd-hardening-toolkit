@@ -1,0 +1,22 @@
+# Binaries
+lnd-hardening-toolkit
+*.exe
+
+# Go
+*.test
+*.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+bin/
