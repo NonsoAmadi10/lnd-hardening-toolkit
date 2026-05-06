@@ -135,7 +135,7 @@ func CheckDangerousFlags(cfg *config.LndConfig) []scanner.Finding {
 		})
 	}
 
-	if cfg.TrickleDelay == 0 {
+	if cfg.TrickleDelayExplicit && cfg.TrickleDelay == 0 {
 		findings = append(findings, scanner.Finding{
 			ID:          "H-6c",
 			Module:      "hygiene",

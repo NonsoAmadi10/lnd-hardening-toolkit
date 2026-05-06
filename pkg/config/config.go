@@ -16,11 +16,12 @@ type LndConfig struct {
 	DebugHTLC          bool   `ini:"debughtlc"`
 	NoSeedBackup       bool   `ini:"noseedbackup"`
 	NoEncryptWallet    bool   `ini:"noencryptwallet"`
-	UnsafeDisconnect   bool   `ini:"unsafe-disconnect"`
-	TrickleDelay       int    `ini:"trickledelay"`
-	MaxPendingChannels int    `ini:"maxpendingchannels"`
-	MaxChanSize        int64  `ini:"maxchansize"`
-	Alias              string `ini:"alias"`
+	UnsafeDisconnect      bool   `ini:"unsafe-disconnect"`
+	TrickleDelay          int    `ini:"trickledelay"`
+	TrickleDelayExplicit  bool   // true if trickledelay was explicitly set in config
+	MaxPendingChannels    int    `ini:"maxpendingchannels"`
+	MaxChanSize           int64  `ini:"maxchansize"`
+	Alias                 string `ini:"alias"`
 
 	// Listener configuration (multi-value keys)
 	RPCListeners  []string
@@ -124,6 +125,7 @@ func ParseBytes(data []byte) (*LndConfig, error) {
 		c.NoEncryptWallet, _ = appSec.Key("noencryptwallet").Bool()
 		c.UnsafeDisconnect, _ = appSec.Key("unsafe-disconnect").Bool()
 		c.TrickleDelay, _ = appSec.Key("trickledelay").Int()
+		c.TrickleDelayExplicit = appSec.Key("trickledelay").String() != ""
 		c.MaxPendingChannels, _ = appSec.Key("maxpendingchannels").Int()
 		c.MaxChanSize, _ = appSec.Key("maxchansize").Int64()
 		c.Alias = appSec.Key("alias").String()

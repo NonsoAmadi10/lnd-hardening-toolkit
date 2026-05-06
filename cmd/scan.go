@@ -2,7 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/NonsoAmadi10/lnd-hardening-toolkit/pkg/checks"
+	"github.com/NonsoAmadi10/lnd-hardening-toolkit/pkg/config"
+	"github.com/NonsoAmadi10/lnd-hardening-toolkit/pkg/lndpath"
+	"github.com/NonsoAmadi10/lnd-hardening-toolkit/pkg/report"
+	"github.com/NonsoAmadi10/lnd-hardening-toolkit/pkg/scanner"
 	"github.com/spf13/cobra"
 )
 
@@ -29,17 +35,13 @@ Supports two modes:
 
 If no --config flag is provided, the scanner will attempt to auto-detect
 the LND configuration at common paths (~/.lnd/lnd.conf).`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("⚡ LND Hardening Toolkit")
-		fmt.Println("Scanner not yet implemented — coming soon.")
-		return nil
-	},
+	RunE: runScan,
 }
 
 func init() {
 	scanCmd.Flags().StringVar(&configPath, "config", "", "path to lnd.conf (auto-detected if not set)")
 	scanCmd.Flags().StringVar(&lndDir, "lnddir", "", "LND data directory (auto-detected if not set)")
-	scanCmd.Flags().StringVar(&outputFormat, "format", "table", "output format: table, json, sarif")
+	scanCmd.Flags().StringVar(&outputFormat, "format", "table", "output format: table, json")
 	scanCmd.Flags().StringVar(&minSeverity, "min-severity", "low", "minimum severity to display: critical, high, medium, low, info")
 	scanCmd.Flags().StringVar(&failOn, "fail-on", "critical", "exit 1 if any finding at or above this severity")
 	scanCmd.Flags().BoolVar(&verbose, "verbose", false, "show INFO-level findings")
@@ -48,3 +50,127 @@ func init() {
 
 	rootCmd.AddCommand(scanCmd)
 }
+
+func runScan(cmd *cobra.Command, args []string) error {
+	// 1. Detect paths
+	paths, err := lndpath.Detect(lndDir, configPath)
+	if err != nil {
+		return fmt.Errorf("detecting LND paths: %w", err)
+	}
+
+	if paths.ConfigFile == "" {
+		fmt.Fprintln(os.Stderr, "⚠  No lnd.conf found. Use --config to specify the path.")
+		fmt.Fprintln(os.Stderr, "   Searched:", paths.LndDir)
+		return fmt.Errorf("no configuration file found")
+	}
+
+	// 2. Parse config
+	cfg, err := config.Parse(paths.ConfigFile)
+	if err != nil {
+		return fmt.Errorf("parsing config: %w", err)
+	}
+
+	// Update paths with network from config if available
+	if cfg.Bitcoin.Network != "" {
+		paths.Network = cfg.Bitcoin.Network
+	}
+
+	// 3. Run all checks
+	r := &scanner.Report{}
+
+	// File permission checks
+	filePaths := checks.FilePaths{
+		WalletDB:         paths.WalletDB(),
+		TLSKey:           paths.TLSKey,
+		AdminMacaroon:    paths.AdminMacaroon(),
+		ReadonlyMacaroon: paths.ReadonlyMacaroon(),
+		InvoiceMacaroon:  paths.InvoiceMacaroon(),
+		ChannelBackup:    paths.ChannelBackup(),
+		ConfigFile:       paths.ConfigFile,
+	}
+	for _, f := range checks.CheckFilePermissions(filePaths) {
+		r.Add(f)
+	}
+
+	// Transport checks
+	for _, f := range checks.CheckTLSCert(paths.TLSCert) {
+		r.Add(f)
+	}
+	for _, f := range checks.CheckRPCBindAddress(cfg) {
+		r.Add(f)
+	}
+	for _, f := range checks.CheckExternalIPLeak(cfg) {
+		r.Add(f)
+	}
+
+	// Access control checks
+	for _, f := range checks.CheckNoMacaroons(cfg) {
+		r.Add(f)
+	}
+	for _, f := range checks.CheckAdminMacaroonLeaks(paths.DataDir) {
+		r.Add(f)
+	}
+
+	// Dangerous flags
+	for _, f := range checks.CheckDangerousFlags(cfg) {
+		r.Add(f)
+	}
+
+	// Network privacy checks
+	for _, f := range checks.CheckTorConfig(cfg) {
+		r.Add(f)
+	}
+	for _, f := range checks.CheckPrivacySettings(cfg) {
+		r.Add(f)
+	}
+
+	// Channel safety checks
+	for _, f := range checks.CheckChannelSafety(cfg) {
+		r.Add(f)
+	}
+
+	// 4. Filter by minimum severity
+	if !verbose {
+		r = filterReport(r, scanner.Low)
+	} else {
+		r = filterReport(r, scanner.Info)
+	}
+
+	if sev, err := scanner.ParseSeverity(minSeverity); err == nil && sev > scanner.Info {
+		r = filterReport(r, sev)
+	}
+
+	// 5. Output
+	if quiet {
+		fmt.Printf("%d\n", r.Score())
+	} else {
+		switch outputFormat {
+		case "json":
+			if err := report.JSONWriter(os.Stdout, r); err != nil {
+				return fmt.Errorf("writing JSON: %w", err)
+			}
+		default:
+			report.TableWriter(os.Stdout, r, !noColor)
+		}
+	}
+
+	// 6. Exit code for CI/CD
+	if threshold, err := scanner.ParseSeverity(failOn); err == nil {
+		if r.HasFindingsAtOrAbove(threshold) {
+			os.Exit(1)
+		}
+	}
+
+	return nil
+}
+
+func filterReport(r *scanner.Report, minSev scanner.Severity) *scanner.Report {
+	filtered := &scanner.Report{}
+	for _, f := range r.Findings {
+		if f.Severity >= minSev {
+			filtered.Add(f)
+		}
+	}
+	return filtered
+}
+

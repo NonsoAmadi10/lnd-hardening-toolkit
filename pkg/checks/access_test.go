@@ -152,10 +152,7 @@ func TestCheckDangerousFlags_DebugHTLC(t *testing.T) {
 }
 
 func TestCheckDangerousFlags_TrickleDelayZero(t *testing.T) {
-	// Need to distinguish "not set" (0 default) from "explicitly set to 0".
-	// For now, we flag TrickleDelay == 0 only if the config explicitly sets it.
-	// The config parser will leave it at 0 if not set, so we test that scenario.
-	cfg := &config.LndConfig{TrickleDelay: 0}
+	cfg := &config.LndConfig{TrickleDelay: 0, TrickleDelayExplicit: true}
 	findings := CheckDangerousFlags(cfg)
 	found := false
 	for _, f := range findings {
@@ -164,7 +161,18 @@ func TestCheckDangerousFlags_TrickleDelayZero(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("expected finding for trickledelay=0")
+		t.Error("expected finding for explicitly set trickledelay=0")
+	}
+}
+
+func TestCheckDangerousFlags_TrickleDelayNotSet(t *testing.T) {
+	// When not explicitly set, TrickleDelay defaults to 0 but should NOT be flagged
+	cfg := &config.LndConfig{TrickleDelay: 0, TrickleDelayExplicit: false}
+	findings := CheckDangerousFlags(cfg)
+	for _, f := range findings {
+		if f.ID == "H-6c" {
+			t.Error("should NOT flag trickledelay when it was not explicitly set")
+		}
 	}
 }
 
@@ -184,8 +192,9 @@ func TestCheckDangerousFlags_UnsafeDisconnect(t *testing.T) {
 
 func TestCheckDangerousFlags_Clean(t *testing.T) {
 	cfg := &config.LndConfig{
-		DebugLevel:   "info",
-		TrickleDelay: 5000,
+		DebugLevel:           "info",
+		TrickleDelay:         5000,
+		TrickleDelayExplicit: true,
 	}
 	findings := CheckDangerousFlags(cfg)
 	if len(findings) != 0 {
