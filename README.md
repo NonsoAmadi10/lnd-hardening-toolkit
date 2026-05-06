@@ -1,5 +1,9 @@
 # ⚡ lnaudit
 
+[![CI](https://github.com/NonsoAmadi10/lnaudit/actions/workflows/ci.yml/badge.svg)](https://github.com/NonsoAmadi10/lnaudit/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/NonsoAmadi10/lnaudit)](https://goreportcard.com/report/github.com/NonsoAmadi10/lnaudit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A security scanner for LND node operators. Audits your Lightning node configuration, identifies misconfigurations, and provides actionable hardening recommendations.
 
 Built for anyone running LND in production — solo operators, routing nodes, exchanges, and custodians.
@@ -109,6 +113,14 @@ lnaudit/
 - [LND Deep Dive](https://nonsoamadi10.github.io/lnd-deep-dive/) — the security research behind this tool
 - [LND](https://github.com/lightningnetwork/lnd) — the Lightning Network Daemon
 
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before getting started.
+
+- 🐛 [Report a bug](https://github.com/NonsoAmadi10/lnaudit/issues/new?template=bug_report.md)
+- 💡 [Request a feature](https://github.com/NonsoAmadi10/lnaudit/issues/new?template=feature_request.md)
+- 🔒 [Report a security vulnerability](SECURITY.md)
+
 ## License
 
-MIT
+[MIT](LICENSE)
