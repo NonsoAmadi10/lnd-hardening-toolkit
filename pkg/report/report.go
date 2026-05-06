@@ -10,7 +10,14 @@ import (
 )
 
 // TableWriter renders a human-readable table report to the given writer.
+// Score, rating, and summary are computed from the report's own findings.
 func TableWriter(w io.Writer, r *scanner.Report, useColor bool) {
+	TableWriterWithScore(w, r, r.Score(), r.Rating(), r.Summary(), useColor)
+}
+
+// TableWriterWithScore renders a table report using externally provided score values.
+// This allows displaying filtered findings while showing the true unfiltered score.
+func TableWriterWithScore(w io.Writer, r *scanner.Report, score int, rating scanner.Rating, summary map[scanner.Severity]int, useColor bool) {
 	divider := strings.Repeat("━", 40)
 
 	fmt.Fprintf(w, "⚡ LND Hardening Toolkit\n")
@@ -38,11 +45,6 @@ func TableWriter(w io.Writer, r *scanner.Report, useColor bool) {
 			fmt.Fprintln(w)
 		}
 	}
-
-	// Score summary
-	score := r.Score()
-	rating := r.Rating()
-	summary := r.Summary()
 
 	fmt.Fprintf(w, "%s\n", divider)
 	fmt.Fprintf(w, "Score: %d/100 %s %s\n", score, rating.Emoji(), rating.Label())
@@ -74,11 +76,16 @@ type jsonFinding struct {
 }
 
 // JSONWriter renders a machine-readable JSON report to the given writer.
+// Score is computed from the report's own findings.
 func JSONWriter(w io.Writer, r *scanner.Report) error {
-	summary := r.Summary()
+	return JSONWriterWithScore(w, r, r.Score(), r.Rating(), r.Summary())
+}
+
+// JSONWriterWithScore renders JSON using externally provided score values.
+func JSONWriterWithScore(w io.Writer, r *scanner.Report, score int, rating scanner.Rating, summary map[scanner.Severity]int) error {
 	out := JSONOutput{
-		Score:  r.Score(),
-		Rating: string(r.Rating()),
+		Score:  score,
+		Rating: string(rating),
 		Summary: map[string]int{
 			"critical": summary[scanner.Critical],
 			"high":     summary[scanner.High],

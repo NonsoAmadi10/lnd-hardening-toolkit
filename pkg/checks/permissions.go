@@ -59,7 +59,10 @@ func CheckFilePermissions(paths FilePaths) []scanner.Finding {
 }
 
 func checkSingleFile(sf sensitiveFile) *scanner.Finding {
-	info, err := os.Stat(sf.path)
+	// Use Lstat to check the file itself, not what a symlink points to.
+	// This prevents an attacker from planting symlinks to mislead permission reports
+	// and protects against remediation commands (chmod) being applied to symlink targets.
+	info, err := os.Lstat(sf.path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil // File doesn't exist — not a permission issue
@@ -70,6 +73,22 @@ func checkSingleFile(sf sensitiveFile) *scanner.Finding {
 			Severity:    scanner.Low,
 			Title:       fmt.Sprintf("Cannot stat %s", sf.name),
 			Description: fmt.Sprintf("Unable to check permissions on %s: %v", sf.path, err),
+		}
+	}
+
+	// Warn if the file is a symlink — sensitive files should not be symlinks
+	if info.Mode()&os.ModeSymlink != 0 {
+		return &scanner.Finding{
+			ID:       fmt.Sprintf("PERM-%s", sf.name),
+			Module:   sf.module,
+			Severity: scanner.High,
+			Title:    fmt.Sprintf("%s is a symlink (unexpected)", sf.name),
+			Description: fmt.Sprintf(
+				"%s at %s is a symbolic link. Sensitive files should be regular files, "+
+					"not symlinks, to prevent symlink-following attacks.",
+				sf.name, sf.path,
+			),
+			Remediation: fmt.Sprintf("Investigate why %s is a symlink and replace with a regular file.", sf.path),
 		}
 	}
 

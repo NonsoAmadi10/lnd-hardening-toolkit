@@ -129,36 +129,44 @@ func runScan(cmd *cobra.Command, args []string) error {
 		r.Add(f)
 	}
 
-	// 4. Filter by minimum severity
+	// 4. Compute score on the FULL unfiltered report (always reflects true posture)
+	fullScore := r.Score()
+	fullRating := r.Rating()
+	fullSummary := r.Summary()
+	hasFailure := false
+	if threshold, err := scanner.ParseSeverity(failOn); err == nil {
+		hasFailure = r.HasFindingsAtOrAbove(threshold)
+	}
+
+	// 5. Filter for display only (does NOT affect score)
+	display := r
 	if !verbose {
-		r = filterReport(r, scanner.Low)
+		display = filterReport(r, scanner.Low)
 	} else {
-		r = filterReport(r, scanner.Info)
+		display = filterReport(r, scanner.Info)
 	}
 
 	if sev, err := scanner.ParseSeverity(minSeverity); err == nil && sev > scanner.Info {
-		r = filterReport(r, sev)
+		display = filterReport(display, sev)
 	}
 
-	// 5. Output
+	// 6. Output (use filtered findings but full score)
 	if quiet {
-		fmt.Printf("%d\n", r.Score())
+		fmt.Printf("%d\n", fullScore)
 	} else {
 		switch outputFormat {
 		case "json":
-			if err := report.JSONWriter(os.Stdout, r); err != nil {
+			if err := report.JSONWriterWithScore(os.Stdout, display, fullScore, fullRating, fullSummary); err != nil {
 				return fmt.Errorf("writing JSON: %w", err)
 			}
 		default:
-			report.TableWriter(os.Stdout, r, !noColor)
+			report.TableWriterWithScore(os.Stdout, display, fullScore, fullRating, fullSummary, !noColor)
 		}
 	}
 
-	// 6. Exit code for CI/CD
-	if threshold, err := scanner.ParseSeverity(failOn); err == nil {
-		if r.HasFindingsAtOrAbove(threshold) {
-			os.Exit(1)
-		}
+	// 7. Exit code for CI/CD (based on FULL report, not filtered)
+	if hasFailure {
+		os.Exit(1)
 	}
 
 	return nil

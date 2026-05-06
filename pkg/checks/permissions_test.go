@@ -151,6 +151,27 @@ func TestCheckFilePermissions_TorOnionKey(t *testing.T) {
 	}
 }
 
+func TestCheckFilePermissions_SymlinkDetection(t *testing.T) {
+	skipOnWindows(t)
+
+	dir := t.TempDir()
+	realFile := filepath.Join(dir, "real_wallet.db")
+	os.WriteFile(realFile, []byte("real"), 0600)
+
+	symlinkPath := filepath.Join(dir, "wallet.db")
+	os.Symlink(realFile, symlinkPath)
+
+	paths := FilePaths{WalletDB: symlinkPath}
+	findings := CheckFilePermissions(paths)
+
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding for symlinked wallet.db, got %d", len(findings))
+	}
+	if findings[0].Severity != scanner.High {
+		t.Errorf("severity = %v, want HIGH for symlink", findings[0].Severity)
+	}
+}
+
 func TestIsOverlyPermissive(t *testing.T) {
 	tests := []struct {
 		actual, max os.FileMode
