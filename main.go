@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import "github.com/NonsoAmadi10/lnd-hardening-toolkit/cmd"
 
 func main() {
-	fmt.Println("lnd-hardening-toolkit")
+	cmd.Execute()
 }
