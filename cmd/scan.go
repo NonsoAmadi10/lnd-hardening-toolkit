@@ -129,6 +129,11 @@ func runScan(cmd *cobra.Command, args []string) error {
 		r.Add(f)
 	}
 
+	// Network exposure checks
+	for _, f := range checks.CheckNetworkExposure(cfg) {
+		r.Add(f)
+	}
+
 	// 4. Compute score on the FULL unfiltered report (always reflects true posture)
 	fullScore := r.Score()
 	fullRating := r.Rating()

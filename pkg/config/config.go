@@ -22,6 +22,7 @@ type LndConfig struct {
 	MaxPendingChannels   int    `ini:"maxpendingchannels"`
 	MaxChanSize          int64  `ini:"maxchansize"`
 	Alias                string `ini:"alias"`
+	NAT                  bool   `ini:"nat"`
 
 	// Listener configuration (multi-value keys)
 	RPCListeners  []string
@@ -129,6 +130,7 @@ func ParseBytes(data []byte) (*LndConfig, error) {
 		c.MaxPendingChannels, _ = appSec.Key("maxpendingchannels").Int()
 		c.MaxChanSize, _ = appSec.Key("maxchansize").Int64()
 		c.Alias = appSec.Key("alias").String()
+		c.NAT, _ = appSec.Key("nat").Bool()
 
 		c.RPCListeners = readMulti(appSec, "rpclisten")
 		c.RESTListeners = readMulti(appSec, "restlisten")
