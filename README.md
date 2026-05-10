@@ -203,10 +203,18 @@ Each finding deducts points from a starting score of 100:
 - [x] Scoring engine with severity-based ratings
 - [x] Network exposure and open port scanning
 - [x] Live node scanning via gRPC (version/CVE, sync, peers, balance, force-close)
-- [ ] SARIF output for CI/CD integration
+- [ ] Confidence levels on findings (Certain, Firm, Tentative)
+- [ ] SARIF output for GitHub Code Scanning and CI/CD pipelines
+- [ ] Severity threshold gating (`--fail-on high`)
+- [ ] Baseline diffing (compare scans, report only new findings)
+- [ ] Standalone HTML report generation
+- [ ] Macaroon permission auditing (detect overly permissive credentials)
+- [ ] TLS cipher and protocol version probing
+- [ ] Scan profiles (`--profile quick|full|compliance`)
+- [ ] Custom check definitions via YAML policy files
 - [ ] Homebrew / Docker distribution
 - [ ] Fleet scanning (multiple nodes)
-- [ ] Baseline policy files (YAML)
+- [ ] Plugin system for community-contributed checks
 
 ## Related
 
