@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/NonsoAmadi10/lnaudit)](https://github.com/NonsoAmadi10/lnaudit/releases)
 
-A security scanner for Lightning Network Daemon (LND) nodes. Audits your node's configuration, file permissions, and security settings, then tells you exactly what to fix.
+A security scanner for Lightning Network Daemon (LND) nodes. Audits your node's configuration, file permissions, network exposure, and live runtime state, then tells you exactly what to fix.
 
 Built for anyone running LND in production: solo operators, routing nodes, exchanges, and custodians.
 
@@ -58,11 +58,19 @@ make build
 ## Quick Start
 
 ```bash
-# Auto-detect LND config and scan
+# Config-only scan (no running node needed)
 lnaudit scan
 
 # Specify config path explicitly
 lnaudit scan --config ~/.lnd/lnd.conf
+
+# Live scan against a running LND node via gRPC
+lnaudit scan --connect localhost:10009
+
+# Live scan with explicit credential paths
+lnaudit scan --connect localhost:10009 \
+  --tlscert ~/.lnd/tls.cert \
+  --macaroon ~/.lnd/data/chain/bitcoin/mainnet/admin.macaroon
 
 # JSON output for scripting / CI
 lnaudit scan --format json
@@ -83,6 +91,9 @@ lnaudit scan --fail-on high
 | **Access Control** | Macaroon authentication, stray macaroon detection, dangerous flags | `--noseedbackup`, `--noencryptwallet`, `debuglevel=trace` |
 | **Network Privacy** | Tor configuration, SCID alias, proxy settings | Missing stream isolation, V2 onion (deprecated), unencrypted onion key |
 | **Channel Safety** | Watchtower config, confirmation depth, channel limits | No watchtower, low confirmation targets, excessive max channel size |
+| **Network Exposure** | P2P listener binding, NAT/UPnP, gRPC/REST non-loopback | Listen on all interfaces, UPnP auto port-forwarding |
+| **Port Scanning** | Probes known LND and Bitcoin ports for unexpected exposure | gRPC/REST open, Bitcoin Core RPC reachable |
+| **Live Checks** | Version vs known CVEs, chain sync, peer count, force-close, balance | Running a CVE-affected version, unsynced node, zero peers |
 
 ## Example Output
 
@@ -122,6 +133,9 @@ Usage:
 Flags:
       --config string         path to lnd.conf (auto-detected if not set)
       --lnddir string         LND data directory (auto-detected if not set)
+      --connect string        gRPC address of running LND node (e.g., localhost:10009)
+      --macaroon string       path to admin.macaroon (auto-detected from lnddir)
+      --tlscert string        path to tls.cert for gRPC (auto-detected from lnddir)
       --format string         output format: table, json (default "table")
       --min-severity string   minimum severity to display (default "low")
       --fail-on string        exit 1 if findings at or above this severity (default "critical")
@@ -129,6 +143,8 @@ Flags:
       --no-color              disable colored output
       --quiet                 only output the score
 ```
+
+When `--connect` is provided, the scanner runs both config checks (if `lnd.conf` is available) and live checks via gRPC. Config is optional in live-only mode.
 
 ## Architecture
 
@@ -138,10 +154,18 @@ lnaudit/
 ├── pkg/
 │   ├── scanner/            # Core engine: Finding, Severity, Report, scoring
 │   ├── checks/             # Security check implementations
-│   │   ├── permissions.go  # File permission auditing
+│   │   ├── permissions.go  # File permission auditing, symlink detection
 │   │   ├── transport.go    # TLS, RPC bind, IP exposure
+│   │   ├── exposure.go     # P2P listener, NAT/UPnP, network exposure
 │   │   ├── access.go       # Macaroons, dangerous flags
-│   │   └── privacy.go      # Tor, SCID alias, channel safety
+│   │   ├── privacy.go      # Tor, SCID alias, channel safety
+│   │   ├── live.go         # Live checks: version, sync, peers, balance
+│   │   ├── cves.go         # Known CVE database for LND versions
+│   │   └── ports.go        # Open port scanning
+│   ├── grpc/               # gRPC client interface and connection
+│   │   ├── client.go       # LndClient interface and response types
+│   │   ├── connect.go      # TLS + macaroon auth, real implementation
+│   │   └── mock.go         # MockClient for unit testing
 │   ├── config/             # lnd.conf parser (INI format)
 │   ├── lndpath/            # Auto-detection of LND paths
 │   └── report/             # Output formatters (table, JSON)
@@ -177,7 +201,8 @@ Each finding deducts points from a starting score of 100:
 - [x] Dangerous flag detection
 - [x] Tor and privacy configuration audit
 - [x] Scoring engine with severity-based ratings
-- [ ] Live node scanning via gRPC
+- [x] Network exposure and open port scanning
+- [x] Live node scanning via gRPC (version/CVE, sync, peers, balance, force-close)
 - [ ] SARIF output for CI/CD integration
 - [ ] Homebrew / Docker distribution
 - [ ] Fleet scanning (multiple nodes)
