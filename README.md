@@ -210,8 +210,11 @@ Each finding deducts points from a starting score of 100:
 - [ ] Standalone HTML report generation
 - [ ] Macaroon permission auditing (detect overly permissive credentials)
 - [ ] TLS cipher and protocol version probing
+- [ ] Backup safety validation (freshness, existence, encryption status)
 - [ ] Scan profiles (`--profile quick|full|compliance`)
 - [ ] Custom check definitions via YAML policy files
+- [ ] Docker security checks (root user, privileged mode, secret handling, volume permissions)
+- [ ] Kubernetes security checks (NetworkPolicy, RBAC, secret mounts, pod security context)
 - [ ] Homebrew / Docker distribution
 - [ ] Fleet scanning (multiple nodes)
 - [ ] Plugin system for community-contributed checks
