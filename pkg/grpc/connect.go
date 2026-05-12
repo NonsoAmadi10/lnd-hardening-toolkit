@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/macaroons"
@@ -11,6 +12,12 @@ import (
 	"google.golang.org/grpc/credentials"
 	"gopkg.in/macaroon.v2"
 )
+
+// rpcTimeout is the maximum time allowed for a single gRPC call.
+const rpcTimeout = 10 * time.Second
+
+// maxStringLen caps the length of untrusted strings from gRPC responses.
+const maxStringLen = 4096
 
 // realClient wraps an actual gRPC connection to LND.
 type realClient struct {
@@ -33,6 +40,13 @@ func Connect(host, tlsCertPath, macaroonPath string) (LndClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading macaroon %s: %w", macaroonPath, err)
 	}
+
+	// Zero out raw bytes after parsing
+	defer func() {
+		for i := range macBytes {
+			macBytes[i] = 0
+		}
+	}()
 
 	mac := &macaroon.Macaroon{}
 	if err := mac.UnmarshalBinary(macBytes); err != nil {
@@ -60,16 +74,27 @@ func Connect(host, tlsCertPath, macaroonPath string) (LndClient, error) {
 	}, nil
 }
 
+// truncate caps a string at maxStringLen to prevent memory abuse
+// from malicious gRPC responses.
+func truncate(s string) string {
+	if len(s) > maxStringLen {
+		return s[:maxStringLen] + "...(truncated)"
+	}
+	return s
+}
+
 func (c *realClient) GetInfo() (*NodeInfo, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
+	defer cancel()
+
 	resp, err := c.client.GetInfo(ctx, &lnrpc.GetInfoRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("GetInfo: %w", err)
 	}
 
 	return &NodeInfo{
-		Version:            resp.Version,
-		CommitHash:         resp.CommitHash,
+		Version:            truncate(resp.Version),
+		CommitHash:         truncate(resp.CommitHash),
 		SyncedToChain:      resp.SyncedToChain,
 		SyncedToGraph:      resp.SyncedToGraph,
 		NumPeers:           int(resp.NumPeers),
@@ -80,7 +105,9 @@ func (c *realClient) GetInfo() (*NodeInfo, error) {
 }
 
 func (c *realClient) ListChannels() ([]Channel, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
+	defer cancel()
+
 	resp, err := c.client.ListChannels(ctx, &lnrpc.ListChannelsRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("ListChannels: %w", err)
@@ -90,7 +117,7 @@ func (c *realClient) ListChannels() ([]Channel, error) {
 	for i, ch := range resp.Channels {
 		channels[i] = Channel{
 			ChanID:        ch.ChanId,
-			RemotePubkey:  ch.RemotePubkey,
+			RemotePubkey:  truncate(ch.RemotePubkey),
 			Capacity:      ch.Capacity,
 			LocalBalance:  ch.LocalBalance,
 			RemoteBalance: ch.RemoteBalance,
@@ -103,7 +130,9 @@ func (c *realClient) ListChannels() ([]Channel, error) {
 }
 
 func (c *realClient) PendingChannels() ([]PendingForceClose, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
+	defer cancel()
+
 	resp, err := c.client.PendingChannels(ctx, &lnrpc.PendingChannelsRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("PendingChannels: %w", err)
@@ -112,8 +141,8 @@ func (c *realClient) PendingChannels() ([]PendingForceClose, error) {
 	pending := make([]PendingForceClose, 0, len(resp.PendingForceClosingChannels))
 	for _, fc := range resp.PendingForceClosingChannels {
 		pending = append(pending, PendingForceClose{
-			ChannelPoint:     fc.Channel.ChannelPoint,
-			ClosingTxHash:    fc.ClosingTxid,
+			ChannelPoint:     truncate(fc.Channel.ChannelPoint),
+			ClosingTxHash:    truncate(fc.ClosingTxid),
 			LimboBalance:     fc.LimboBalance,
 			RecoveredBalance: fc.RecoveredBalance,
 		})
@@ -123,7 +152,9 @@ func (c *realClient) PendingChannels() ([]PendingForceClose, error) {
 }
 
 func (c *realClient) WalletBalance() (*WalletBalance, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
+	defer cancel()
+
 	resp, err := c.client.WalletBalance(ctx, &lnrpc.WalletBalanceRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("WalletBalance: %w", err)

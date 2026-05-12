@@ -86,8 +86,19 @@ type GossipConfig struct {
 	SubBatchDelay string `ini:"gossip.sub-batch-delay"`
 }
 
+// maxConfigSize is the largest config file we'll read (1 MB).
+const maxConfigSize = 1 << 20
+
 // Parse reads an lnd.conf file and returns a structured LndConfig.
 func Parse(path string) (*LndConfig, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading config: %w", err)
+	}
+	if info.Size() > maxConfigSize {
+		return nil, fmt.Errorf("config file too large (%d bytes, max %d)", info.Size(), maxConfigSize)
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading config: %w", err)

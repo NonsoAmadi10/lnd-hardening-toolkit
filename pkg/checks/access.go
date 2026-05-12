@@ -55,6 +55,11 @@ func CheckAdminMacaroonLeaks(lndDataDir string) []scanner.Finding {
 			}
 			seen[absPath] = true
 
+			// Skip symlinks to avoid false positives and dangerous remediation
+			if info, err := os.Lstat(absPath); err != nil || info.Mode()&os.ModeSymlink != 0 {
+				continue
+			}
+
 			// Skip if it's inside the LND data directory
 			if lndDataDir != "" && strings.HasPrefix(absPath, lndDataDir) {
 				continue
@@ -70,13 +75,13 @@ func CheckAdminMacaroonLeaks(lndDataDir string) []scanner.Finding {
 				ID:       "A-3",
 				Module:   "access",
 				Severity: sev,
-				Title:    fmt.Sprintf("Macaroon found outside LND data directory: %s", absPath),
+				Title:    fmt.Sprintf("Macaroon found outside LND data directory: %s", name),
 				Description: fmt.Sprintf(
-					"%s was found at %s. Macaroons should only exist in the LND data directory. "+
+					"A copy of %s was found in %s. Macaroons should only exist in the LND data directory. "+
 						"Stray copies increase the risk of credential theft.",
-					name, absPath,
+					name, filepath.Dir(absPath),
 				),
-				Remediation: fmt.Sprintf("rm %s", absPath),
+				Remediation: "Securely delete the stray macaroon file. Verify it is not needed before removal.",
 				Reference:   "POST-MORTEM.md#9-binance-2019",
 			})
 		}
